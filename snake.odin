@@ -12,9 +12,10 @@ SNAKE_MAX :: GRID_SIZE * GRID_SIZE
 snake: [SNAKE_MAX]Vector2i
 snake_length: int
 move_direction: Vector2i
-tick_rate: f32 = 0.17
+tick_rate: f32 = 0.1
 tick_timer := tick_rate
 game_over: bool
+food_pos: Vector2i
 
 Move_Direction :: enum {
     Up,
@@ -42,6 +43,8 @@ main :: proc()
 
         handle_input()
         handle_snake_movement()
+        handle_food_collision()
+        game_over = check_deadly_collisions()
 
         rl.BeginDrawing()
         rl.ClearBackground({37, 40, 133, 255})
@@ -52,6 +55,7 @@ main :: proc()
         
         rl.BeginMode2D(camera)
 
+        handle_food_draw()
         handle_snake_draw()
 
         if game_over {
@@ -60,25 +64,17 @@ main :: proc()
         
         rl.EndMode2D()
         rl.EndDrawing()
+
+        free_all(context.temp_allocator)
     }
     rl.CloseWindow()
-}
-
-
-create_snake :: proc()
-{
-    head_start_pos: Vector2i = { GRID_SIZE / 2, GRID_SIZE / 2 }
-    snake[0] = head_start_pos
-    snake[1] = head_start_pos - { 0, 1 }
-    snake[2] = head_start_pos - { 0, 2 }
-    snake_length = 3
-    move_direction = move_direction_values[.Down]
 }
 
 
 start_game :: proc()
 {
     create_snake()
+    create_food()
     game_over = false
 }
 
@@ -98,21 +94,54 @@ handle_input :: proc()
         move_direction = move_direction_values[.Right]
     }
     if game_over && rl.IsKeyPressed(.ENTER) {
-        start_game()
-    } else {
-        tick_timer -= rl.GetFrameTime()
+        start_game()  
+    }
+}
+
+
+create_snake :: proc()
+{
+    head_start_pos: Vector2i = { GRID_SIZE / 2, GRID_SIZE / 2 }
+    snake[0] = head_start_pos
+    snake[1] = head_start_pos - { 0, 1 }
+    snake[2] = head_start_pos - { 0, 2 }
+    snake_length = 3
+    move_direction = move_direction_values[.Down]
+}
+
+
+create_food :: proc()
+{
+    position_occupied: [GRID_SIZE][GRID_SIZE]bool
+
+    for i in 0..<snake_length {
+        position_occupied[snake[i].x][snake[i].y] = true
+    }
+
+    free_cells := make([dynamic]Vector2i, context.temp_allocator)
+
+    for x in 0..<GRID_SIZE {
+        for y in 0..<GRID_SIZE {
+            if !position_occupied[x][y] {
+                append(&free_cells, Vector2i {x,y})
+            }
+        }
+        
+        if len(free_cells) > 0 {
+            food_pos = free_cells[rl.GetRandomValue(0, i32(len(free_cells) - 1))]
+        }
     }
 }
 
 
 handle_snake_movement :: proc()
 {
+    if game_over { return }
+    
     tick_timer -= rl.GetFrameTime()
     if tick_timer <= 0 {
         next_part_pos := snake[0]
         snake[0] = snake[0] + move_direction
-        head_pos := snake[0]
-        game_over = handle_collision(head_pos)
 
         for i in 1..<snake_length {
             cur_pos := snake[i]
@@ -138,9 +167,41 @@ handle_snake_draw :: proc()
 }
 
 
-handle_collision :: proc(head_pos: Vector2i) -> bool
+handle_food_draw :: proc() 
 {
-    return head_pos.x < 0 || head_pos.y < 0 || head_pos.x >= GRID_SIZE || head_pos.y > GRID_SIZE
+    food_rect := rl.Rectangle {
+        f32(food_pos.x) * CELL_SIZE,
+        f32(food_pos.y) * CELL_SIZE,
+        CELL_SIZE,
+        CELL_SIZE,
+    }
+
+    rl.DrawRectangleRec(food_rect, rl.RED)
+}
+
+
+check_deadly_collisions :: proc() -> bool
+{
+    head_pos := snake[0]
+    wall_collision := head_pos.x <= -1 || head_pos.y <= -1 || head_pos.x >= GRID_SIZE || head_pos.y >= GRID_SIZE 
+    return wall_collision || tail_collision()
+}
+
+
+tail_collision :: proc() -> bool {
+    for i in 1..<snake_length-1 {
+        if snake[i] == snake[0] { return true }
+    }
+    return false
+}
+
+
+handle_food_collision :: proc() {
+    if snake[0] == food_pos {
+        snake_length += 1
+        snake[snake_length - 1] = snake[snake_length - 2]
+        create_food()
+    }
 }
 
 
