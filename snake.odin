@@ -3,17 +3,18 @@ package snake
 import rl "vendor:raylib"
 
 WINDOW_SIZE :: 1000
-GRID_WIDTH :: 20
+GRID_SIZE :: 20
 CELL_SIZE :: 16
-CANVAS_SIZE :: GRID_WIDTH * CELL_SIZE
+CANVAS_SIZE :: GRID_SIZE * CELL_SIZE
 Vector2i :: [2]int
-SNAKE_MAX :: GRID_WIDTH * GRID_WIDTH
+SNAKE_MAX :: GRID_SIZE * GRID_SIZE
 
 snake: [SNAKE_MAX]Vector2i
-move_direction: Vector2i
-tick_rate: f32 = 0.13
-tick_timer := tick_rate
 snake_length: int
+move_direction: Vector2i
+tick_rate: f32 = 0.17
+tick_timer := tick_rate
+game_over: bool
 
 Move_Direction :: enum {
     Up,
@@ -29,17 +30,18 @@ move_direction_values := [Move_Direction]Vector2i {
     .Right = { 1, 0 },
 }
 
+
 main :: proc() 
 {
     rl.InitWindow(WINDOW_SIZE, WINDOW_SIZE, "Snake")
     rl.SetConfigFlags({ .VSYNC_HINT })
 
-    create_snake()
+    start_game()
 
     for !rl.WindowShouldClose() {
 
         handle_input()
-        handle_movement()
+        handle_snake_movement()
 
         rl.BeginDrawing()
         rl.ClearBackground({37, 40, 133, 255})
@@ -47,9 +49,14 @@ main :: proc()
         camera := rl.Camera2D {
             zoom = f32(WINDOW_SIZE) / CANVAS_SIZE
         }
+        
         rl.BeginMode2D(camera)
 
-        handle_snake()
+        handle_snake_draw()
+
+        if game_over {
+            handle_game_over()
+        }
         
         rl.EndMode2D()
         rl.EndDrawing()
@@ -57,15 +64,24 @@ main :: proc()
     rl.CloseWindow()
 }
 
+
 create_snake :: proc()
 {
-    head_start_pos: Vector2i = { GRID_WIDTH / 2, GRID_WIDTH / 2 }
+    head_start_pos: Vector2i = { GRID_SIZE / 2, GRID_SIZE / 2 }
     snake[0] = head_start_pos
     snake[1] = head_start_pos - { 0, 1 }
     snake[2] = head_start_pos - { 0, 2 }
     snake_length = 3
     move_direction = move_direction_values[.Down]
 }
+
+
+start_game :: proc()
+{
+    create_snake()
+    game_over = false
+}
+
 
 handle_input :: proc() 
 {
@@ -81,14 +97,22 @@ handle_input :: proc()
     if rl.IsKeyDown(.RIGHT) && move_direction != move_direction_values[.Left] {
         move_direction = move_direction_values[.Right]
     }
+    if game_over && rl.IsKeyPressed(.ENTER) {
+        start_game()
+    } else {
+        tick_timer -= rl.GetFrameTime()
+    }
 }
 
-handle_movement :: proc() 
+
+handle_snake_movement :: proc()
 {
     tick_timer -= rl.GetFrameTime()
     if tick_timer <= 0 {
         next_part_pos := snake[0]
         snake[0] = snake[0] + move_direction
+        head_pos := snake[0]
+        game_over = handle_collision(head_pos)
 
         for i in 1..<snake_length {
             cur_pos := snake[i]
@@ -99,7 +123,8 @@ handle_movement :: proc()
     }
 }
 
-handle_snake :: proc()
+
+handle_snake_draw :: proc()
 {
     for i in 0..<snake_length {
         snake_rect := rl.Rectangle {
@@ -110,4 +135,17 @@ handle_snake :: proc()
         }
         rl.DrawRectangleRec(snake_rect, rl.BLUE)
     }
+}
+
+
+handle_collision :: proc(head_pos: Vector2i) -> bool
+{
+    return head_pos.x < 0 || head_pos.y < 0 || head_pos.x >= GRID_SIZE || head_pos.y > GRID_SIZE
+}
+
+
+handle_game_over :: proc() 
+{
+    rl.DrawText("Game Over!", 4, 4, 25, rl.RED)
+    rl.DrawText("Press Enter to play again", 4, 30, 15, rl.BLACK)
 }
