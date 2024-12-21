@@ -81,6 +81,7 @@ main :: proc()
 
         free_all(context.temp_allocator)
     }
+    unload_sprites(sprites)
     rl.CloseWindow()
 }
 
@@ -93,6 +94,15 @@ load_sprites :: proc() -> Sprites {
 	    rl.LoadTexture("./assets/graphics/body.png"),
 	    rl.LoadTexture("./assets/graphics/tail.png")
     }
+}
+
+
+unload_sprites :: proc(sprites: Sprites)
+{
+    rl.UnloadTexture(sprites.food)
+    rl.UnloadTexture(sprites.head)
+    rl.UnloadTexture(sprites.body)
+    rl.UnloadTexture(sprites.tail)
 }
 
 
