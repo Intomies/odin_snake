@@ -190,22 +190,41 @@ handle_snake_draw :: proc(sprites: Sprites)
         } else {
             direction = snake[i - 1] - position
         }
-        rotate := math.atan2(f32(direction.y), f32(direction.x)) * math.DEG_PER_RAD
-        source := rl.Rectangle {
-            0,0,
-            f32(part_sprite.width),
-            f32(part_sprite.height)
-        }
-        destination := rl.Rectangle {
-            f32(position.x) * CELL_SIZE + 0.5 * CELL_SIZE, 
-            f32(position.y) * CELL_SIZE + 0.5 * CELL_SIZE,
-            CELL_SIZE,
-            CELL_SIZE,
-        }
+        
+        rotate := rotate_sprite(direction)
+        source := get_source_rect(part_sprite)
+        destination := get_destination_rect(position)
     
         rl.DrawTexturePro(part_sprite, source, destination, {CELL_SIZE, CELL_SIZE}*0.5, rotate, rl.WHITE)
     }
 
+}
+
+
+rotate_sprite :: proc(direction: Vector2i) -> f32
+{
+    return math.atan2(f32(direction.y), f32(direction.x)) * math.DEG_PER_RAD
+}
+
+
+get_source_rect :: proc(part_sprite: rl.Texture2D) -> rl.Rectangle 
+{
+    return rl.Rectangle {
+        0,0,
+        f32(part_sprite.width),
+        f32(part_sprite.height)
+    }
+}
+
+
+get_destination_rect :: proc(position: Vector2i) -> rl.Rectangle
+{
+    return rl.Rectangle {
+        f32(position.x) * CELL_SIZE + 0.5 * CELL_SIZE, 
+        f32(position.y) * CELL_SIZE + 0.5 * CELL_SIZE,
+        CELL_SIZE,
+        CELL_SIZE,
+    }
 }
 
 
