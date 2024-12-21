@@ -10,14 +10,16 @@ CANVAS_SIZE :: GRID_SIZE * CELL_SIZE
 Vector2i :: [2]int
 SNAKE_MAX :: GRID_SIZE * GRID_SIZE
 
-snake: [SNAKE_MAX]Vector2i
-snake_length: int
-move_direction: Vector2i
-next_move_direction: Vector2i
-tick_rate: f32 = 0.1
-tick_timer := tick_rate
-game_over: bool
-food_pos: Vector2i
+GameState :: struct {
+    tick_rate: f32,
+    tick_timer: f32,
+    snake: [SNAKE_MAX]Vector2i,
+    snake_length: int,
+    move_direction: Vector2i,
+    next_move_direction: Vector2i,
+    game_over: bool,
+    food_pos: Vector2i,
+}
 
 Sprites :: struct {
     food: rl.Texture2D,
@@ -46,16 +48,17 @@ main :: proc()
     rl.InitWindow(WINDOW_SIZE, WINDOW_SIZE, "Snake")
     rl.SetConfigFlags({ .VSYNC_HINT })
 
+    state := GameState{}
     sprites := load_sprites()
 
-    start_game()
+    start_game(&state)
 
     for !rl.WindowShouldClose() {
 
-        handle_input()
-        handle_snake_movement()
-        handle_food_collision()
-        game_over = check_deadly_collisions()
+        handle_input(&state)
+        handle_snake_movement(&state)
+        handle_food_collision(&state)
+        state.game_over = check_deadly_collisions(&state)
 
         rl.BeginDrawing()
         rl.ClearBackground({37, 40, 133, 255})
@@ -66,10 +69,10 @@ main :: proc()
         
         rl.BeginMode2D(camera)
 
-        handle_food_draw(sprites.food)
-        handle_snake_draw(sprites)
+        handle_food_draw(&state, sprites.food)
+        handle_snake_draw(&state, sprites)
 
-        if game_over {
+        if state.game_over {
             handle_game_over()
         }
         
@@ -93,52 +96,54 @@ load_sprites :: proc() -> Sprites {
 }
 
 
-start_game :: proc()
+start_game :: proc(state: ^GameState)
 {
-    create_snake()
-    create_food()
-    next_move_direction = move_direction
-    game_over = false
+    state.tick_rate = 0.1
+    state.tick_timer = state.tick_rate
+    create_snake(state)
+    create_food(state)
+    state.next_move_direction = state.move_direction
+    state.game_over = false
 }
 
 
-handle_input :: proc() 
+handle_input :: proc(state: ^GameState) 
 {
-    if rl.IsKeyDown(.UP) && move_direction != move_direction_values[.Down]{
-        next_move_direction = move_direction_values[.Up]
+    if rl.IsKeyDown(.UP) && state.move_direction != move_direction_values[.Down]{
+        state.next_move_direction = move_direction_values[.Up]
     }
-    if rl.IsKeyDown(.DOWN) && move_direction != move_direction_values[.Up] {
-        next_move_direction = move_direction_values[.Down]
+    if rl.IsKeyDown(.DOWN) && state.move_direction != move_direction_values[.Up] {
+        state.next_move_direction = move_direction_values[.Down]
     }
-    if rl.IsKeyDown(.LEFT) && move_direction != move_direction_values[.Right] {
-        next_move_direction = move_direction_values[.Left]
+    if rl.IsKeyDown(.LEFT) && state.move_direction != move_direction_values[.Right] {
+        state.next_move_direction = move_direction_values[.Left]
     }
-    if rl.IsKeyDown(.RIGHT) && move_direction != move_direction_values[.Left] {
-        next_move_direction = move_direction_values[.Right]
+    if rl.IsKeyDown(.RIGHT) && state.move_direction != move_direction_values[.Left] {
+        state.next_move_direction = move_direction_values[.Right]
     }
-    if game_over && rl.IsKeyPressed(.ENTER) {
-        start_game()  
+    if state.game_over && rl.IsKeyPressed(.ENTER) {
+        start_game(state)  
     }
 }
 
 
-create_snake :: proc()
+create_snake :: proc(state: ^GameState)
 {
     head_start_pos: Vector2i = { GRID_SIZE / 2, GRID_SIZE / 2 }
-    snake[0] = head_start_pos
-    snake[1] = head_start_pos - { 0, 1 }
-    snake[2] = head_start_pos - { 0, 2 }
-    snake_length = 3
-    move_direction = move_direction_values[.Down]
+    state.snake[0] = head_start_pos
+    state.snake[1] = head_start_pos - { 0, 1 }
+    state.snake[2] = head_start_pos - { 0, 2 }
+    state.snake_length = 3
+    state.move_direction = move_direction_values[.Down]
 }
 
 
-create_food :: proc()
+create_food :: proc(state: ^GameState)
 {
     position_occupied: [GRID_SIZE][GRID_SIZE]bool
 
-    for i in 0..<snake_length {
-        position_occupied[snake[i].x][snake[i].y] = true
+    for i in 0..<state.snake_length {
+        position_occupied[state.snake[i].x][state.snake[i].y] = true
     }
 
     free_cells := make([dynamic]Vector2i, context.temp_allocator)
@@ -151,47 +156,47 @@ create_food :: proc()
         }
         
         if len(free_cells) > 0 {
-            food_pos = free_cells[rl.GetRandomValue(0, i32(len(free_cells) - 1))]
+            state.food_pos = free_cells[rl.GetRandomValue(0, i32(len(free_cells) - 1))]
         }
     }
 }
 
 
-handle_snake_movement :: proc()
+handle_snake_movement :: proc(state: ^GameState)
 {
-    if game_over { return }
+    if state.game_over { return }
     
-    tick_timer -= rl.GetFrameTime()
-    if tick_timer <= 0 {
-        move_direction = next_move_direction
-        next_part_pos := snake[0]
-        snake[0] = snake[0] + move_direction
+    state.tick_timer -= rl.GetFrameTime()
+    if state.tick_timer <= 0 {
+        state.move_direction = state.next_move_direction
+        next_part_pos := state.snake[0]
+        state.snake[0] = state.snake[0] + state.move_direction
 
-        for i in 1..<snake_length {
-            cur_pos := snake[i]
-            snake[i] = next_part_pos
+        for i in 1..<state.snake_length {
+            cur_pos := state.snake[i]
+            state.snake[i] = next_part_pos
             next_part_pos = cur_pos
         }
-        tick_timer = tick_rate + tick_timer
+        state.tick_timer = state.tick_rate + state.tick_timer
     }
 }
 
 
-handle_snake_draw :: proc(sprites: Sprites)
+handle_snake_draw :: proc(state: ^GameState, sprites: Sprites)
 {
-    for i in 0..<snake_length {
-        position := snake[i]
+    for i in 0..<state.snake_length {
+        position := state.snake[i]
         part_sprite := sprites.body
         direction: Vector2i
         
         if i == 0 {
             part_sprite = sprites.head
-            direction = position - snake[i + 1]
-        } else if i == snake_length - 1 {
+            direction = position - state.snake[i + 1]
+        } else if i == state.snake_length - 1 {
             part_sprite = sprites.tail
-            direction = snake[i - 1] - position
+            direction = state.snake[i - 1] - position
         } else {
-            direction = snake[i - 1] - position
+            direction = state.snake[i - 1] - position
         }
 
         rotate := rotate_sprite(direction)
@@ -231,34 +236,34 @@ get_destination_rect :: proc(position: Vector2i) -> rl.Rectangle
 }
 
 
-handle_food_draw :: proc(sprite: rl.Texture2D) 
+handle_food_draw :: proc(state: ^GameState, sprite: rl.Texture2D) 
 {
-    position: rl.Vector2 = {f32(food_pos.x), f32(food_pos.y)} * CELL_SIZE
+    position: rl.Vector2 = {f32(state.food_pos.x), f32(state.food_pos.y)} * CELL_SIZE
     rl.DrawTextureV(sprite, position, rl.WHITE)
 }
 
 
-check_deadly_collisions :: proc() -> bool
+check_deadly_collisions :: proc(state: ^GameState) -> bool
 {
-    head_pos := snake[0]
+    head_pos := state.snake[0]
     wall_collision := head_pos.x <= -1 || head_pos.y <= -1 || head_pos.x >= GRID_SIZE || head_pos.y >= GRID_SIZE 
-    return wall_collision || tail_collision()
+    return wall_collision || tail_collision(state)
 }
 
 
-tail_collision :: proc() -> bool {
-    for i in 1..<snake_length-1 {
-        if snake[i] == snake[0] { return true }
+tail_collision :: proc(state: ^GameState) -> bool {
+    for i in 1..<state.snake_length-1 {
+        if state.snake[i] == state.snake[0] { return true }
     }
     return false
 }
 
 
-handle_food_collision :: proc() {
-    if snake[0] == food_pos {
-        snake_length += 1
-        snake[snake_length - 1] = snake[snake_length - 2]
-        create_food()
+handle_food_collision :: proc(state: ^GameState) {
+    if state.snake[0] == state.food_pos {
+        state.snake_length += 1
+        state.snake[state.snake_length - 1] = state.snake[state.snake_length - 2]
+        create_food(state)
     }
 }
 
