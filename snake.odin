@@ -13,6 +13,7 @@ SNAKE_MAX :: GRID_SIZE * GRID_SIZE
 snake: [SNAKE_MAX]Vector2i
 snake_length: int
 move_direction: Vector2i
+next_move_direction: Vector2i
 tick_rate: f32 = 0.1
 tick_timer := tick_rate
 game_over: bool
@@ -96,6 +97,7 @@ start_game :: proc()
 {
     create_snake()
     create_food()
+    next_move_direction = move_direction
     game_over = false
 }
 
@@ -103,16 +105,16 @@ start_game :: proc()
 handle_input :: proc() 
 {
     if rl.IsKeyDown(.UP) && move_direction != move_direction_values[.Down]{
-        move_direction = move_direction_values[.Up]
+        next_move_direction = move_direction_values[.Up]
     }
     if rl.IsKeyDown(.DOWN) && move_direction != move_direction_values[.Up] {
-        move_direction = move_direction_values[.Down]
+        next_move_direction = move_direction_values[.Down]
     }
     if rl.IsKeyDown(.LEFT) && move_direction != move_direction_values[.Right] {
-        move_direction = move_direction_values[.Left]
+        next_move_direction = move_direction_values[.Left]
     }
     if rl.IsKeyDown(.RIGHT) && move_direction != move_direction_values[.Left] {
-        move_direction = move_direction_values[.Right]
+        next_move_direction = move_direction_values[.Right]
     }
     if game_over && rl.IsKeyPressed(.ENTER) {
         start_game()  
@@ -161,6 +163,7 @@ handle_snake_movement :: proc()
     
     tick_timer -= rl.GetFrameTime()
     if tick_timer <= 0 {
+        move_direction = next_move_direction
         next_part_pos := snake[0]
         snake[0] = snake[0] + move_direction
 
@@ -190,7 +193,7 @@ handle_snake_draw :: proc(sprites: Sprites)
         } else {
             direction = snake[i - 1] - position
         }
-        
+
         rotate := rotate_sprite(direction)
         source := get_source_rect(part_sprite)
         destination := get_destination_rect(position)
