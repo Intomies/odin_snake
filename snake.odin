@@ -1,6 +1,7 @@
 package snake
 
 import rl "vendor:raylib"
+import "core:math"
 
 WINDOW_SIZE :: 1000
 GRID_SIZE :: 20
@@ -16,6 +17,13 @@ tick_rate: f32 = 0.1
 tick_timer := tick_rate
 game_over: bool
 food_pos: Vector2i
+
+Sprites :: struct {
+    food: rl.Texture2D,
+    head: rl.Texture2D,
+    body: rl.Texture2D,
+    tail: rl.Texture2D,
+}
 
 Move_Direction :: enum {
     Up,
@@ -37,6 +45,8 @@ main :: proc()
     rl.InitWindow(WINDOW_SIZE, WINDOW_SIZE, "Snake")
     rl.SetConfigFlags({ .VSYNC_HINT })
 
+    sprites := load_sprites()
+
     start_game()
 
     for !rl.WindowShouldClose() {
@@ -55,8 +65,8 @@ main :: proc()
         
         rl.BeginMode2D(camera)
 
-        handle_food_draw()
-        handle_snake_draw()
+        handle_food_draw(sprites.food)
+        handle_snake_draw(sprites)
 
         if game_over {
             handle_game_over()
@@ -68,6 +78,17 @@ main :: proc()
         free_all(context.temp_allocator)
     }
     rl.CloseWindow()
+}
+
+
+load_sprites :: proc() -> Sprites {
+    
+    return {
+        rl.LoadTexture("./assets/graphics/food.png"),
+	    rl.LoadTexture("./assets/graphics/head.png"),
+	    rl.LoadTexture("./assets/graphics/body.png"),
+	    rl.LoadTexture("./assets/graphics/tail.png")
+    }
 }
 
 
@@ -153,30 +174,45 @@ handle_snake_movement :: proc()
 }
 
 
-handle_snake_draw :: proc()
+handle_snake_draw :: proc(sprites: Sprites)
 {
     for i in 0..<snake_length {
-        snake_rect := rl.Rectangle {
-            f32(snake[i].x) * CELL_SIZE,
-            f32(snake[i].y) * CELL_SIZE,
+        position := snake[i]
+        part_sprite := sprites.body
+        direction: Vector2i
+        
+        if i == 0 {
+            part_sprite = sprites.head
+            direction = position - snake[i + 1]
+        } else if i == snake_length - 1 {
+            part_sprite = sprites.tail
+            direction = snake[i - 1] - position
+        } else {
+            direction = snake[i - 1] - position
+        }
+        rotate := math.atan2(f32(direction.y), f32(direction.x)) * math.DEG_PER_RAD
+        source := rl.Rectangle {
+            0,0,
+            f32(part_sprite.width),
+            f32(part_sprite.height)
+        }
+        destination := rl.Rectangle {
+            f32(position.x) * CELL_SIZE + 0.5 * CELL_SIZE, 
+            f32(position.y) * CELL_SIZE + 0.5 * CELL_SIZE,
             CELL_SIZE,
             CELL_SIZE,
         }
-        rl.DrawRectangleRec(snake_rect, rl.BLUE)
+    
+        rl.DrawTexturePro(part_sprite, source, destination, {CELL_SIZE, CELL_SIZE}*0.5, rotate, rl.WHITE)
     }
+
 }
 
 
-handle_food_draw :: proc() 
+handle_food_draw :: proc(sprite: rl.Texture2D) 
 {
-    food_rect := rl.Rectangle {
-        f32(food_pos.x) * CELL_SIZE,
-        f32(food_pos.y) * CELL_SIZE,
-        CELL_SIZE,
-        CELL_SIZE,
-    }
-
-    rl.DrawRectangleRec(food_rect, rl.RED)
+    position: rl.Vector2 = {f32(food_pos.x), f32(food_pos.y)} * CELL_SIZE
+    rl.DrawTextureV(sprite, position, rl.WHITE)
 }
 
 
